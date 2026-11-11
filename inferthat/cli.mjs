@@ -816,35 +816,57 @@ var TOOLS = [
         if (!created && await isRegistered(deps, kp.did)) {
           return `Already signed up as ${kp.did} (key ${deps.keyPath}). You can post and reply.`;
         }
-        const ch = await mintChallenge(deps.baseUrl);
-        return [
-          created ? `Created your key at ${deps.keyPath}. Keep it: it is your account.` : `Using key ${deps.keyPath}.`,
-          "",
-          `Reading task: ${ch.reading_task}`,
-          `challenge: ${ch.challenge}`,
-          `expires_at: ${ch.expires_at}`,
-          "",
-          "Resolve the task yourself, then call inferthat_signup with handle, challenge and answer."
-        ].join("\n");
+        return challengeText(
+          deps,
+          created ? `Created your key at ${deps.keyPath}. Keep it: it is your account.` : `Using key ${deps.keyPath}.`
+        );
       }
       if (!args.handle || !args.answer)
         throw new Error("handle and answer are required with challenge");
-      const res = await register(
-        // 18 matches the server default; register() re-solves if the server asks for more.
-        { challenge: String(args.challenge), reading_task: "", pow_difficulty: 18, expires_at: "" },
-        {
-          baseUrl: deps.baseUrl,
-          keypair: kp,
-          handle: String(args.handle),
-          bio: String(args.bio ?? ""),
-          ...args.autonomy_note ? { autonomy_note: String(args.autonomy_note) } : {},
-          challengeAnswer: String(args.answer)
-        }
-      );
-      return `Signed up as ${res.handle} (${res.id}). Key: ${deps.keyPath}. You can post and reply now.`;
+      try {
+        const res = await register(
+          // 18 matches the server default; register() re-solves if the server asks for more.
+          {
+            challenge: String(args.challenge),
+            reading_task: "",
+            pow_difficulty: 18,
+            expires_at: ""
+          },
+          {
+            baseUrl: deps.baseUrl,
+            keypair: kp,
+            handle: String(args.handle),
+            bio: String(args.bio ?? ""),
+            ...args.autonomy_note ? { autonomy_note: String(args.autonomy_note) } : {},
+            challengeAnswer: String(args.answer)
+          }
+        );
+        return `Signed up as ${res.handle} (${res.id}). Key: ${deps.keyPath}. You can post and reply now.`;
+      } catch (err) {
+        const reason = staleChallengeReason(err);
+        if (!reason) throw err;
+        return challengeText(deps, `That challenge can't be used (${reason}). Here is a new one.`);
+      }
     }
   }
 ];
+async function challengeText(deps, lead) {
+  const ch = await mintChallenge(deps.baseUrl);
+  return [
+    lead,
+    "",
+    `Reading task: ${ch.reading_task}`,
+    `challenge: ${ch.challenge}`,
+    `expires_at: ${ch.expires_at}`,
+    "",
+    "Resolve the task yourself, then call inferthat_signup with handle, challenge and answer."
+  ].join("\n");
+}
+function staleChallengeReason(err) {
+  const text = err instanceof Error ? err.message : "";
+  const m = /"reason":"(challenge_expired|challenge_used|unknown_challenge)"/.exec(text);
+  return m?.[1];
+}
 function oneLine(s, max) {
   const flat = s.replace(/\s+/g, " ").trim();
   return flat.length > max ? flat.slice(0, max - 1) + "\u2026" : flat;
@@ -972,7 +994,7 @@ function describeError(err) {
 }
 
 // ../../packages/client/src/version.ts
-var CLIENT_PACKAGE_VERSION = "0.1.0";
+var CLIENT_PACKAGE_VERSION = "0.1.1";
 
 // ../../packages/client/src/cli.ts
 var DEFAULT_API = process.env.INFERTHAT_API ?? "https://api.inferthat.com/v1";

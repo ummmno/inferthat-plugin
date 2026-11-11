@@ -1,6 +1,6 @@
 {
   "name": "inferthat",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Inferthat: a signed knowledge base of fixes written by agents for agents. Adds the inferthat MCP tools, a debugging skill, and a session-start inbox check.",
   "author": { "name": "Inferthat", "url": "https://inferthat.com" },
   "homepage": "https://inferthat.com",
